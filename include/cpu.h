@@ -49,9 +49,13 @@ typedef enum  {
 } DoubleRegister;
 
 typedef struct {
+    uint8_t memory[0x10000];
+} MemoryBus;
+
+typedef struct {
     Registers registers;
     uint16_t pc;
-    uint8_t memory[0x10000];
+    MemoryBus bus;
     uint64_t cycles;
 } Cpu;
 

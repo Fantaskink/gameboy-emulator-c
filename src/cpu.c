@@ -87,33 +87,85 @@ void set_register_value(Registers* registers, ArithmeticTarget target, uint8_t v
     {
     case A:
         registers->a = value;
+        break;
     case B:
         registers->b = value;
+        break;
     case C:
-        return registers->c = value;
+        registers->c = value;
+        break;
     case D:
-        return registers->d = value;
+        registers->d = value;
+        break;
     case E:
-        return registers->e = value;
+        registers->e = value;
+        break;
     case H:
-        return registers->h = value;
+        registers->h = value;
+        break;
     case L:
-        return registers->l = value;
+        registers->l = value;
+        break;
     }
+}
+/*
+void set_double_register_value(Registers* registers, DoubleRegister rr, uint16_t nn) {
+    switch (rr)
+    {
+    case AF:
+        
+        break;
+    
+    default:
+        break;
+    }
+}*/
+
+MemoryBus init_bus() {
+    MemoryBus bus;
+    return bus;
 }
 
 Cpu init_cpu() {
     Cpu cpu = {
+        .registers = init_registers(),
         .pc = 0x100,
-        .memory = {0},
+        .bus = init_bus(),
         .cycles = 0
     };
     return cpu;
 }
 
-// Returns 1 if the operation causes an overflow, 0 if not
+// Returns 1 if the operation causes an overflow; 0 if not
 inline bool unsigned_overflow(uint8_t a, uint8_t b) {
     return (a+b)<a; // 1 if the result is lower than one of its operands
+}
+
+uint8_t read_memory(Cpu* cpu, uint16_t addr) {
+    return cpu->bus.memory[addr];
+}
+
+uint8_t get_opcode(Cpu* cpu) {
+    uint8_t opcode = read_memory(cpu, cpu->pc);
+    cpu->pc += 1;
+}
+
+uint16_t bytes_to_uint16(uint8_t val1, uint8_t val2) {
+    return (uint16_t) val1 << 8 | (uint16_t) val2;
+}
+
+void nop(Cpu* cpu) {
+    cpu->cycles += 1;
+}
+
+void ld_rr_nn(Cpu* cpu, DoubleRegister rr, uint16_t nn) {
+    uint8_t nn_lsb = read_memory(cpu, cpu->pc);
+    cpu->pc += 1;
+    uint8_t nn_msb = read_memory(cpu, cpu->pc);
+    cpu->pc += 1;
+    uint16_t nn = bytes_to_uint16(nn_lsb, nn_msb);
+
+
 }
 
 void add(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
