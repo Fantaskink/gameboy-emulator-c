@@ -2,6 +2,7 @@
 #define CPU.H
 
 #include <stdint.h>
+#include <builtins.h>
 #include <stdbool.h>
 
 #define ZERO_FLAG_BYTE_POSITION 7
@@ -11,8 +12,15 @@
 
 
 typedef struct {
+    bool zero;
+    bool subtract;
+    bool half_carry;
+    bool carry;
+} FlagsRegister;
+
+typedef struct {
     uint8_t a;
-    uint8_t f;
+    FlagsRegister f;
     uint8_t b;
     uint8_t c;
     uint8_t d;
@@ -20,15 +28,7 @@ typedef struct {
     uint8_t h;
     uint8_t l;
     uint16_t sp;
-
 } Registers;
-
-typedef struct {
-    bool zero;
-    bool subtraction;
-    bool half_carry;
-    bool carry;
-} FlagsRegister;
 
 typedef enum {
     A,
@@ -38,7 +38,7 @@ typedef enum {
     E,
     H,
     L,
-} SingleRegister;
+} ArithmeticTarget;
 
 typedef enum  {
     AF,
@@ -49,6 +49,7 @@ typedef enum  {
 } DoubleRegister;
 
 typedef struct {
+    Registers registers;
     uint16_t pc;
     uint8_t memory[0x10000];
     uint64_t cycles;
