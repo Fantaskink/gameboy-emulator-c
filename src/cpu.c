@@ -116,13 +116,19 @@ inline bool unsigned_overflow(uint8_t a, uint8_t b) {
     return (a+b)<a; // 1 if the result is lower than one of its operands
 }
 
-void add(Cpu cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
-    Registers registers = cpu.registers;
-    uint8_t val1 = get_register_value(registers, reg1);
-    uint8_t val2 = get_register_value(registers, reg2);
+void add(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
+    Registers* registers = &cpu->registers;
+    uint8_t val1 = get_register_value(*registers, reg1);
+    uint8_t val2 = get_register_value(*registers, reg2);
 
-    registers.f.carry = unsigned_overflow(val1, val2);
+    uint8_t new_val = val1 + val2;
+
+    registers->f.zero = new_val == 0,
+    registers->f.subtract = false;
+    registers->f.carry = unsigned_overflow(val1, val2);
+    registers->f.half_carry = (val1 & 0xF) + (val2 & 0xF) > 0xF;
+
+    set_register_value(registers, reg1, new_val);
     
-
-    cpu.cycles += 1;
+    cpu->cycles += 1;
 }
