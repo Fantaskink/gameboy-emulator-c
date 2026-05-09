@@ -2,6 +2,7 @@
 #define CPU.H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <builtins.h>
 #include <stdbool.h>
 
@@ -31,32 +32,52 @@ typedef struct {
 } Registers;
 
 typedef enum {
-    A,
-    B,
-    C,
-    D,
-    E,
-    H,
-    L,
+    REG_A,
+    REG_B,
+    REG_C,
+    REG_D,
+    REG_E,
+    REG_H,
+    REG_L,
 } ArithmeticTarget;
 
 typedef enum  {
-    AF,
-    BC,
-    DE,
-    HL,
-    SP,
-} DoubleRegister;
+    REG_AF,
+    REG_BC,
+    REG_DE,
+    REG_HL,
+    REG_SP,
+} RegisterPair;
+
+typedef void (*InstructionFunc)(Cpu*, int);
 
 typedef struct {
-    uint8_t memory[0x10000];
+    char* name;
+    InstructionFunc handler;
+    int arg;
+} Instruction;
+
+#define NUM_OPCODES 256
+
+Instruction opcodes_8bit[NUM_OPCODES] = {
+    [0x01] = {"LD BC, nn", ld_rr_nn, REG_BC},
+    [0x11] = {"LD DE, nn", ld_rr_nn, REG_DE},
+};
+
+Instruction opcodes_16bit[NUM_OPCODES] = {
+
+};
+ 
+
+typedef struct {
+    uint8_t memory[0xFFFF];
 } MemoryBus;
 
 typedef struct {
     Registers registers;
     uint16_t pc;
     MemoryBus bus;
-    uint64_t cycles;
+    uint64_t t_cycles;
 } Cpu;
 
 #endif

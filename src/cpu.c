@@ -65,19 +65,19 @@ FlagsRegister byte_to_flags(uint8_t value) {
 uint8_t get_register_value(Registers registers, ArithmeticTarget target) {
     switch (target)
     {
-    case A:
+    case REG_A:
         return registers.a;
-    case B:
+    case REG_B:
         return registers.b;
-    case C:
+    case REG_C:
         return registers.c;
-    case D:
+    case REG_D:
         return registers.d;
-    case E:
+    case REG_E:
         return registers.e;
-    case H:
+    case REG_H:
         return registers.h;
-    case L:
+    case REG_L:
         return registers.l;
     }
 }
@@ -85,41 +85,41 @@ uint8_t get_register_value(Registers registers, ArithmeticTarget target) {
 void set_register_value(Registers* registers, ArithmeticTarget target, uint8_t value) {
     switch (target)
     {
-    case A:
+    case REG_A:
         registers->a = value;
         break;
-    case B:
+    case REG_B:
         registers->b = value;
         break;
-    case C:
+    case REG_C:
         registers->c = value;
         break;
-    case D:
+    case REG_D:
         registers->d = value;
         break;
-    case E:
+    case REG_E:
         registers->e = value;
         break;
-    case H:
+    case REG_H:
         registers->h = value;
         break;
-    case L:
+    case REG_L:
         registers->l = value;
         break;
     }
 }
-/*
-void set_double_register_value(Registers* registers, DoubleRegister rr, uint16_t nn) {
+
+void set_double_register_value(Registers* registers, RegisterPair rr, uint16_t nn) {
     switch (rr)
     {
-    case AF:
+    case REG_AF:
         
         break;
     
     default:
         break;
     }
-}*/
+}
 
 MemoryBus init_bus() {
     MemoryBus bus;
@@ -131,9 +131,40 @@ Cpu init_cpu() {
         .registers = init_registers(),
         .pc = 0x100,
         .bus = init_bus(),
-        .cycles = 0
+        .t_cycles = 0
     };
     return cpu;
+}
+
+void step(Cpu* cpu) {
+    uint8_t opcode = get_opcode(cpu);
+    bool is_prefixed = opcode == 0xCB;
+
+    if (is_prefixed)
+    {
+        opcode = get_opcode(cpu);
+        execute_prefixed(cpu, opcode);
+    } else{
+        execute_not_prefixed(cpu, opcode);
+    }
+}
+
+void execute_not_prefixed(Cpu* cpu, uint8_t opcode) {
+    Instruction instr = opcodes_8bit[opcode];
+
+    if (instr.handler != NULL) 
+    {
+        instr.handler(cpu, instr.arg);
+    }
+}
+
+void execute_prefixed(Cpu* cpu, uint8_t opcode) {
+    Instruction instr = opcodes_16bit[opcode];
+
+    if (instr.handler != NULL) 
+    {
+        instr.handler(cpu, instr.arg);
+    }
 }
 
 // Returns 1 if the operation causes an overflow; 0 if not
@@ -141,34 +172,61 @@ inline bool unsigned_overflow(uint8_t a, uint8_t b) {
     return (a+b)<a; // 1 if the result is lower than one of its operands
 }
 
-uint8_t read_memory(Cpu* cpu, uint16_t addr) {
-    return cpu->bus.memory[addr];
+void tick(Cpu* cpu) {
+    cpu->t_cycles += 4;
+}
+
+uint8_t bus_read(Cpu* cpu, uint16_t address) {
+    //if (address <= )
+}
+
+uint8_t read_memory(Cpu* cpu, uint16_t address) {
+    tick(cpu);
+    return cpu->bus.memory[(size_t) address]; // TODO switch to bus_read
 }
 
 uint8_t get_opcode(Cpu* cpu) {
     uint8_t opcode = read_memory(cpu, cpu->pc);
-    cpu->pc += 1;
+    cpu->pc++;
 }
 
-uint16_t bytes_to_uint16(uint8_t val1, uint8_t val2) {
-    return (uint16_t) val1 << 8 | (uint16_t) val2;
+uint16_t bytes_to_uint16(uint8_t high, uint8_t low) {
+    return ((uint16_t)high << 8) | low;
+}
+
+uint16_t read_nn(Cpu* cpu) {
+    uint8_t nn_lsb = read_memory(cpu, cpu->pc);
+    cpu->pc++;
+    uint8_t nn_msb = read_memory(cpu, cpu->pc);
+    cpu->pc++;
+    uint16_t nn = bytes_to_uint16(nn_msb, nn_lsb);
+    return nn;
 }
 
 void nop(Cpu* cpu) {
-    cpu->cycles += 1;
+    cpu->t_cycles += 4;
 }
 
-void ld_rr_nn(Cpu* cpu, DoubleRegister rr, uint16_t nn) {
-    uint8_t nn_lsb = read_memory(cpu, cpu->pc);
-    cpu->pc += 1;
-    uint8_t nn_msb = read_memory(cpu, cpu->pc);
-    cpu->pc += 1;
-    uint16_t nn = bytes_to_uint16(nn_lsb, nn_msb);
-
+void ld_rr_nn(Cpu* cpu, RegisterPair rr) {
+    uint16_t nn = read_nn(cpu);
+    //TODO
 
 }
 
-void add(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
+// ##################
+// # 16-bit opcodes #
+// ##################
+void rlc_r(Cpu* cpu, ArithmeticTarget target) {
+    uint8_t reg = get_register_value(cpu->registers, target);
+    uint8_t carry = (reg >> 7);
+    reg = (reg << 1) | carry;
+
+    cpu->registers.f.zero = carry;
+
+    set_register_value(&cpu->registers, target, reg);
+}
+
+void add_r(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
     Registers* registers = &cpu->registers;
     uint8_t val1 = get_register_value(*registers, reg1);
     uint8_t val2 = get_register_value(*registers, reg2);
@@ -181,6 +239,4 @@ void add(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
     registers->f.half_carry = (val1 & 0xF) + (val2 & 0xF) > 0xF;
 
     set_register_value(registers, reg1, new_val);
-    
-    cpu->cycles += 1;
 }
