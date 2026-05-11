@@ -1,4 +1,33 @@
+#include <stddef.h>
 #include "cpu.h"
+
+enum { NUM_OPCODES = 256 };
+enum { MEMORY_SIZE = 0xFFFF };
+
+enum {
+    ZERO_FLAG_BYTE_POSITION = 7,
+    SUBTRACT_FLAG_BYTE_POSITION = 6,
+    HALF_CARRY_FLAG_BYTE_POSITION = 5,
+    CARRY_FLAG_BYTE_POSITION = 4
+};
+
+typedef enum {
+    REG_A,
+    REG_B,
+    REG_C,
+    REG_D,
+    REG_E,
+    REG_H,
+    REG_L,
+} SingleRegister;
+
+typedef enum  {
+    REG_AF,
+    REG_BC,
+    REG_DE,
+    REG_HL,
+    REG_SP,
+} RegisterPair;
 
 typedef void (*InstructionFunc)(Cpu*, int);
 
@@ -38,7 +67,8 @@ Instruction opcodes_16bit[NUM_OPCODES] = {
 };
 
 Registers init_registers() {
-    Registers registers = {0, 0, 0, 0, 0, 0, 0, 0};
+    FlagsRegister flags = {false};
+    Registers registers = {0, flags, 0, 0, 0, 0, 0, 0};
     return registers;
 }
 
