@@ -1,7 +1,15 @@
+#include <stdio.h>
+
 #include "cpu.h"
 
 int main(int argc, char const *argv[])
 {
-    /* code */
+    Cpu cpu = init_cpu();
+
+    while (true)
+    {
+        step(&cpu);
+    }
+    
     return 0;
 }

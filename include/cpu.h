@@ -1,16 +1,21 @@
-#ifndef CPU.H
-#define CPU.H
+#ifndef CPU_H
+#define CPU_H
 
 #include <stdint.h>
 #include <stddef.h>
 #include <builtins.h>
 #include <stdbool.h>
 
+#define NUM_OPCODES 256
+#define MEMORY_SIZE 0xFFFF
+
 #define ZERO_FLAG_BYTE_POSITION 7
 #define SUBTRACT_FLAG_BYTE_POSITION 6
 #define HALF_CARRY_FLAG_BYTE_POSITION 5
 #define CARRY_FLAG_BYTE_POSITION 4
 
+Cpu init_cpu();
+void step(Cpu* cpu);
 
 typedef struct {
     bool zero;
@@ -28,7 +33,6 @@ typedef struct {
     uint8_t e;
     uint8_t h;
     uint8_t l;
-    uint16_t sp;
 } Registers;
 
 typedef enum {
@@ -39,7 +43,7 @@ typedef enum {
     REG_E,
     REG_H,
     REG_L,
-} ArithmeticTarget;
+} SingleRegister;
 
 typedef enum  {
     REG_AF,
@@ -49,6 +53,18 @@ typedef enum  {
     REG_SP,
 } RegisterPair;
 
+typedef struct {
+    uint8_t memory[MEMORY_SIZE];
+} MemoryBus;
+
+typedef struct {
+    Registers registers;
+    uint16_t pc;
+    uint16_t sp;
+    MemoryBus bus;
+    uint64_t t_cycles;
+} Cpu;
+
 typedef void (*InstructionFunc)(Cpu*, int);
 
 typedef struct {
@@ -56,28 +72,5 @@ typedef struct {
     InstructionFunc handler;
     int arg;
 } Instruction;
-
-#define NUM_OPCODES 256
-
-Instruction opcodes_8bit[NUM_OPCODES] = {
-    [0x01] = {"LD BC, nn", ld_rr_nn, REG_BC},
-    [0x11] = {"LD DE, nn", ld_rr_nn, REG_DE},
-};
-
-Instruction opcodes_16bit[NUM_OPCODES] = {
-
-};
- 
-
-typedef struct {
-    uint8_t memory[0xFFFF];
-} MemoryBus;
-
-typedef struct {
-    Registers registers;
-    uint16_t pc;
-    MemoryBus bus;
-    uint64_t t_cycles;
-} Cpu;
 
 #endif

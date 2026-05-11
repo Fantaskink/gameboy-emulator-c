@@ -1,46 +1,81 @@
 #include "cpu.h"
 
+typedef void (*InstructionFunc)(Cpu*, int);
+
+typedef struct {
+    char* name;
+    InstructionFunc handler;
+    int arg;
+} Instruction;
+
+// Prototypes
+static void nop();
+static void ld_rr_nn(Cpu* cpu, RegisterPair rr);
+
+static void inc_r(Cpu* cpu, SingleRegister target);
+static void dec_r(Cpu* cpu, SingleRegister target);
+
+static void rlca(Cpu* cpu);
+
+
+Instruction opcodes_8bit[NUM_OPCODES] = {
+    [0x00] = {"NOP", nop, NULL},
+    [0x01] = {"LD BC, nn", ld_rr_nn, REG_BC},
+
+    [0x04] = {"INC B", inc_r, REG_B},
+    [0x05] = {"DEC B", dec_r, REG_B},
+
+    [0x07] = {"RLCA", rlca, NULL},
+
+    [0x11] = {"LD DE, nn", ld_rr_nn, REG_DE},
+
+    [0x14] = {"INC D", inc_r, REG_D},
+    [0x15] = {"INC H", inc_r, REG_H},
+};
+
+Instruction opcodes_16bit[NUM_OPCODES] = {
+
+};
+
 Registers init_registers() {
-    Registers registers = {0, 0, 0, 0, 0, 0, 0, 0, 0xFFFE};
+    Registers registers = {0, 0, 0, 0, 0, 0, 0, 0};
     return registers;
 }
-/*
-uint16_t get_af(Registers registers) {
-    return registers.a << 8 | registers.f;
-}
-*/
 
 uint16_t get_bc(Registers registers) {
     return registers.b << 8 | registers.c;
 }
 
-uint16_t get_de(Registers registers) {
-    return registers.d << 8 | registers.e;
-}
+static void set_rr(Registers* registers, RegisterPair rr, uint16_t value) {
+    uint8_t high = ((value & 0xFF00) >> 8);
+    uint8_t low = (value & 0xFF);
 
-uint16_t get_hl(Registers registers) {
-    return registers.h << 8 | registers.l;
-}
-/*
-void set_af(Registers registers, uint16_t value) {
-    registers.a = ((value & 0xFF00) >> 8);
-    registers.f = (value & 0xFF);
-}
-*/
+    uint8_t* reg1 = NULL;
+    uint8_t* reg2 = NULL;
 
-void set_bc(Registers registers, uint16_t value) {
-    registers.b = ((value & 0xFF00) >> 8);
-    registers.c = (value & 0xFF);
-}
-
-void set_de(Registers registers, uint16_t value) {
-    registers.d = ((value & 0xFF00) >> 8);
-    registers.e = (value & 0xFF);
-}
-
-void set_hl(Registers registers, uint16_t value) {
-    registers.h = ((value & 0xFF00) >> 8);
-    registers.l = (value & 0xFF);
+    switch (rr)
+    {
+    case REG_AF:
+        reg1 = &registers->a;
+        reg2 = &registers->f;
+        break;
+    case REG_BC:
+        reg1 = &registers->b;
+        reg2 = &registers->c;
+        break;
+    case REG_DE:
+        reg1 = &registers->d;
+        reg2 = &registers->e;
+        break;
+    case REG_HL:
+        reg1 = &registers->h;
+        reg2 = &registers->l;
+        break;
+    default:
+        break; // TODO: handle error
+    }
+    set_r(registers, reg1, high);
+    set_r(registers, reg2, low);
 }
 
 uint8_t flags_to_byte(FlagsRegister flag) {
@@ -62,7 +97,7 @@ FlagsRegister byte_to_flags(uint8_t value) {
     return flag;
 }
 
-uint8_t get_register_value(Registers registers, ArithmeticTarget target) {
+uint8_t get_register_value(Registers registers, SingleRegister target) {
     switch (target)
     {
     case REG_A:
@@ -82,7 +117,7 @@ uint8_t get_register_value(Registers registers, ArithmeticTarget target) {
     }
 }
 
-void set_register_value(Registers* registers, ArithmeticTarget target, uint8_t value) {
+static void set_r(Registers* registers, SingleRegister target, uint8_t value) {
     switch (target)
     {
     case REG_A:
@@ -109,7 +144,7 @@ void set_register_value(Registers* registers, ArithmeticTarget target, uint8_t v
     }
 }
 
-void set_double_register_value(Registers* registers, RegisterPair rr, uint16_t nn) {
+static void set_register_pair(Registers* registers, RegisterPair rr, uint16_t nn) {
     switch (rr)
     {
     case REG_AF:
@@ -130,11 +165,13 @@ Cpu init_cpu() {
     Cpu cpu = {
         .registers = init_registers(),
         .pc = 0x100,
+        .sp = NULL, // TODO, set to correct value
         .bus = init_bus(),
         .t_cycles = 0
     };
     return cpu;
 }
+
 
 void step(Cpu* cpu) {
     uint8_t opcode = get_opcode(cpu);
@@ -149,7 +186,7 @@ void step(Cpu* cpu) {
     }
 }
 
-void execute_not_prefixed(Cpu* cpu, uint8_t opcode) {
+static void execute_not_prefixed(Cpu* cpu, uint8_t opcode) {
     Instruction instr = opcodes_8bit[opcode];
 
     if (instr.handler != NULL) 
@@ -158,7 +195,7 @@ void execute_not_prefixed(Cpu* cpu, uint8_t opcode) {
     }
 }
 
-void execute_prefixed(Cpu* cpu, uint8_t opcode) {
+static void execute_prefixed(Cpu* cpu, uint8_t opcode) {
     Instruction instr = opcodes_16bit[opcode];
 
     if (instr.handler != NULL) 
@@ -167,17 +204,13 @@ void execute_prefixed(Cpu* cpu, uint8_t opcode) {
     }
 }
 
-// Returns 1 if the operation causes an overflow; 0 if not
-inline bool unsigned_overflow(uint8_t a, uint8_t b) {
-    return (a+b)<a; // 1 if the result is lower than one of its operands
-}
-
-void tick(Cpu* cpu) {
+static void tick(Cpu* cpu) {
     cpu->t_cycles += 4;
 }
 
 uint8_t bus_read(Cpu* cpu, uint16_t address) {
     //if (address <= )
+    // TODO: Implement bus_read
 }
 
 uint8_t read_memory(Cpu* cpu, uint16_t address) {
@@ -188,6 +221,7 @@ uint8_t read_memory(Cpu* cpu, uint16_t address) {
 uint8_t get_opcode(Cpu* cpu) {
     uint8_t opcode = read_memory(cpu, cpu->pc);
     cpu->pc++;
+    return opcode;
 }
 
 uint16_t bytes_to_uint16(uint8_t high, uint8_t low) {
@@ -203,40 +237,82 @@ uint16_t read_nn(Cpu* cpu) {
     return nn;
 }
 
-void nop(Cpu* cpu) {
-    cpu->t_cycles += 4;
-}
 
-void ld_rr_nn(Cpu* cpu, RegisterPair rr) {
+// #################
+// # 8-bit opcodes #
+// #################
+static void nop() {}
+
+static void ld_rr_nn(Cpu* cpu, RegisterPair rr) {
     uint16_t nn = read_nn(cpu);
     //TODO
 
 }
 
+static void inc_r(Cpu* cpu, SingleRegister target) {
+    uint8_t val = get_register_value(cpu->registers, target);
+    uint8_t new_val = val + 1;
+
+    Registers* registers = &cpu->registers;
+
+    registers->f.zero = new_val == 0,
+    registers->f.subtract = false;
+    registers->f.carry = unsigned_overflow(val, 1);
+    registers->f.half_carry = (val & 0xF) + (1 & 0xF) > 0xF;
+
+    set_r(registers, target, new_val);
+}
+
+static void dec_r(Cpu* cpu, SingleRegister target) {
+    uint8_t val = get_register_value(cpu->registers, target);
+    uint8_t new_val = val - 1;
+
+    Registers* registers = &cpu->registers;
+
+    registers->f.zero = new_val == 0,
+    registers->f.subtract = true;
+    registers->f.half_carry = (val & 0xF) + (1 & 0xF) > 0xF; //TODO, fix
+
+    set_r(registers, target, new_val);
+}
+
+static void rlca(Cpu* cpu) {
+    uint8_t val = get_register_value(cpu->registers, REG_A);
+    uint8_t carry = (val >> 7);
+    val = (val << 1) | carry;
+
+    cpu->registers.f.zero = false;
+    cpu->registers.f.subtract = false;
+    cpu->registers.f.half_carry = false;
+    cpu->registers.f.carry = carry;
+
+    set_r(&cpu->registers, REG_A, val);
+}
+
+static void add_r(Cpu* cpu, SingleRegister target) {
+    Registers* registers = &cpu->registers;
+    uint8_t val1 = get_register_value(*registers, REG_A);
+    uint8_t val2 = get_register_value(*registers, target);
+
+    uint16_t sum = val1 + val2;
+
+    registers->f.zero = sum == 0,
+    registers->f.subtract = false;
+    registers->f.carry = unsigned_overflow(val1, val2);
+    registers->f.half_carry = (val1 & 0xF) + (val2 & 0xF) > 0xF;
+
+    set_r(registers, REG_A, sum);
+}
+
 // ##################
 // # 16-bit opcodes #
 // ##################
-void rlc_r(Cpu* cpu, ArithmeticTarget target) {
+static void rlc_r(Cpu* cpu, SingleRegister target) {
     uint8_t reg = get_register_value(cpu->registers, target);
     uint8_t carry = (reg >> 7);
     reg = (reg << 1) | carry;
 
     cpu->registers.f.zero = carry;
 
-    set_register_value(&cpu->registers, target, reg);
-}
-
-void add_r(Cpu* cpu, ArithmeticTarget reg1, ArithmeticTarget reg2) {
-    Registers* registers = &cpu->registers;
-    uint8_t val1 = get_register_value(*registers, reg1);
-    uint8_t val2 = get_register_value(*registers, reg2);
-
-    uint8_t new_val = val1 + val2;
-
-    registers->f.zero = new_val == 0,
-    registers->f.subtract = false;
-    registers->f.carry = unsigned_overflow(val1, val2);
-    registers->f.half_carry = (val1 & 0xF) + (val2 & 0xF) > 0xF;
-
-    set_register_value(registers, reg1, new_val);
+    set_r(&cpu->registers, target, reg);
 }
