@@ -29,11 +29,11 @@ typedef enum  {
 } RegisterPair;
 
 typedef struct {
-    uint16_t x;
-    uint16_t y;
-    uint16_t z;
-    uint16_t p;
-    uint16_t q;
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+    uint32_t p;
+    uint32_t q;
 } OpcodeData;
 
 // Prototypes
@@ -53,6 +53,20 @@ SingleRegister r_table[8] = {
     REG_E,
     REG_H,
     REG_L,
+};
+
+RegisterPair rp_table[4] = {
+    REG_BC,
+    REG_DE,
+    REG_HL,
+    REG_SP,
+};
+
+RegisterPair rp2_tabe[4] = {
+    REG_BC,
+    REG_DE,
+    REG_HL,
+    REG_AF,
 };
 
 Registers init_registers() {
